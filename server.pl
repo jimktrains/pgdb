@@ -47,8 +47,9 @@ if(my $pid = fork()){
 	for(;$client_addr = accept(CLIENT, SERVER);	$mygid++){ 
 		last if fork();
 	}
-	CLIENT->autoflush;
+
 	print CLIENT "VER 1 PGDB-JK\n";
+	CLIENT->autoflush;
 	my $line = <CLIENT>;
 	print $line;
 	#remote pid : remote mpi id : remote hostname
