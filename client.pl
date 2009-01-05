@@ -28,7 +28,7 @@ SOCKET->autoflush(1);
 
 #remote pid : remote mpi id : remote hostname
 #print <SOCKET>;
-print SOCKET "$progpid:$progid:" . `hostname` . "\n";
+print SOCKET "$progpid:$progid:".`hostname`."\n";
 #print "$progpid:$progid:" . `hostname` . "\n";
 print <SOCKET>;
 my $GDBSTDOUT;

@@ -44,12 +44,11 @@ if(my $pid = fork()){
 	#http://www.bearcave.com/unix_hacks/perl/perl.htm
 	#"however, apparently last cannot be used to exit while loops in perl" my experience too:(
 	 
-	for(;$client_addr = accept(CLIENT, SERVER);	$mygid++){ 
+	for(;accept(CLIENT, SERVER);){ 
 		last if fork();
 	}
 
-#	CLIENT->autoflush(1);
-#	print CLIENT "VER 1 PGDB-JK\n";
+	print CLIENT "VER 1 PGDB-JK\n";
 
 	my $line = <CLIENT>;
 	print $line;
@@ -61,9 +60,9 @@ if(my $pid = fork()){
 	my $buf;
 	undef $buf;
 	undef $line;
-	msgsnd($id, pack("l! l! l! l!", $add_type, $mygid, $rpid, $rid), 0);
+	msgsnd($id, pack("l! l! l!", $add_type, $rpid, $rid), 0);
 	print CLIENT "Hello, $rid\n";
-	while (defined($line = <CLIENT>) or msgrcv($id, $buf, 1024, $mygid, 0)){
+	for (;defined($line = <CLIENT>) or msgrcv($id, $buf, 1024, $mygid, 0);){
 		if(defined $line){
 			chomp $line;
 			msgsnd($id, pack("l! l! a*", $send_type, $mygid, $line), 0);
@@ -86,12 +85,11 @@ if(my $pid = fork()){
 	undef $tbuf;
 	while(defined($line = <STDIN>) or msgrcv($id, $abuf, 1024, $add_type, 0) or msgrcv($id, $tbuf, 1024, $send_type, 0)){
 		if(defined $line){
-			print "% ";
 			if($line =~ /^pgdb_/){
 				if($line =~ /pgdb_list_hosts/){
 					print "" . (length keys %nodes) . "\n";
 					foreach (keys %nodes){
-						print "gid: $_\n";
+						print "rid: $_\n";
 					}
 				}
 			} else {
@@ -111,18 +109,19 @@ if(my $pid = fork()){
 			}
 		}
 		if(defined $abuf){
-			my($t, $gid, $rpid, $rid) = unpack("l! l! l! l!", $abuf);
-			my %h = {"gid" => $gid, "rpid" => $rpid, "rid" => $rid};	
+			my($t, $rpid, $rid) = unpack("l! l! l!", $abuf);
+			my %h = {"rpid" => $rpid, "rid" => $rid};	
 			%nodes->{$rid} = \&h;
 		}
 		if(defined $tbuf){
-			my($t, $gid, $msg) = unpack("l! l! a*", $abuf);
-			print "$gid $msg\n";
+			my($t, $rid, $msg) = unpack("l! l! a*", $abuf);
+			print "$rid $msg\n";
 		}
 		
 		undef $abuf;
 		undef $tbuf;
 		undef $line;
+		print "% ";
 	}
 }
 
