@@ -4,7 +4,8 @@
 
 use strict; 
 use Socket; 
-use IPC::Open2;
+use IPC::Open3;
+use IO::Handle;
 
 my $progname = shift or die "Must give program's name";
 my $progpid = shift or die "Must give program's pid";
@@ -20,22 +21,31 @@ my $proto = getprotobyname('tcp');
 my $iaddr = inet_aton($host); 
 my $paddr = sockaddr_in($port, $iaddr); 
 # create the socket, connect to the port 
+
 socket(SOCKET, PF_INET, SOCK_STREAM, $proto) or die "socket: $!"; 
 connect(SOCKET, $paddr) or die "connect: $!"; 
+SOCKET->autoflush(1);
 
-
-
-my($rdrfh, $wtrfh);
-my $gdbpid = open2($rdrfh, $wtrfh, "gdb $progname $progpid");
+#remote pid : remote mpi id : remote hostname
+print <SOCKET>;
+print SOCKET "$progpid:$progid:" . `hostname` . "\n";
+#print "$progpid:$progid:" . `hostname` . "\n";
+print <SOCKET>;
+my $GDBSTDOUT;
+my $GDBSTDIN;
+my $GDBSTDERR;
+my $gdbpid = open3($GDBSTDIN, $GDBSTDOUT, $GDBSTDERR, "gdb $progname $progpid");
 
 if(my $mypid = fork()){
 	my $cmd = "";
 	while($cmd ne "quit"){
 		$cmd = <SOCKET>;
-		print $wtrfh $cmd; 
+		$cmd = "quit" if not defined $cmd;
+		print $GDBSTDOUT $cmd; 
 	}
+	
 } else {
-	while(my $line = <$rdrfh>){
+	while(my $line = (<$GDBSTDOUT> ||  <$GDBSTDERR>)){
 		print SOCKET $line;
 	}
 }
