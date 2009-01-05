@@ -48,8 +48,9 @@ if(my $pid = fork()){
 		last if fork();
 	}
 
-	print CLIENT "VER 1 PGDB-JK\n";
-	CLIENT->autoflush;
+#	CLIENT->autoflush(1);
+#	print CLIENT "VER 1 PGDB-JK\n";
+
 	my $line = <CLIENT>;
 	print $line;
 	#remote pid : remote mpi id : remote hostname

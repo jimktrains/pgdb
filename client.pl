@@ -5,7 +5,7 @@
 use strict; 
 use Socket; 
 use IPC::Open3;
-use IO::Handle;
+use FileHandle;
 
 my $progname = shift or die "Must give program's name";
 my $progpid = shift or die "Must give program's pid";
@@ -27,7 +27,7 @@ connect(SOCKET, $paddr) or die "connect: $!";
 SOCKET->autoflush(1);
 
 #remote pid : remote mpi id : remote hostname
-print <SOCKET>;
+#print <SOCKET>;
 print SOCKET "$progpid:$progid:" . `hostname` . "\n";
 #print "$progpid:$progid:" . `hostname` . "\n";
 print <SOCKET>;

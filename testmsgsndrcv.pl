@@ -2,7 +2,7 @@
 use IPC::SysV qw(IPC_PRIVATE IPC_RMID IPC_CREAT S_IRUSR S_IWUSR);
 
 my $id = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR | S_IWUSR);
-
+die ":(" unless defined $id;
 my $sent = "message";
 my $sent2 = "Hello";
 my $type = 1234;
