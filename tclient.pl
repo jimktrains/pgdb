@@ -1,7 +1,4 @@
 #! /usr/bin/perl -w 
-# client1.pl - a simple client 
-#---------------- 
-
 use strict; 
 use Socket; 
 use FileHandle;
@@ -14,5 +11,6 @@ connect(SOCKET, sockaddr_in($port, inet_aton($host)) ) or die "connect: $!";
 SOCKET->autoflush(1);
 
 print SOCKET "JIM:TEST:".`hostname`."\n";
+print SOCKET "WHOOO\n";
 print <SOCKET>;
 close SOCKET or die "close: $!"
