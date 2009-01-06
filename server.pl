@@ -14,8 +14,16 @@ my $sent = "message";
 my $type_sent = 1234;
 my $rcvd;
 my $type_rcvd;
+my $buf;
+die "message queue id not defined\n" unless defined $id;
 
-die "# msgsnd failed\n" unless defined $id;
+print "message queue id: $id\n";
+print "Testing message queue\n";
+msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
+print "Sent OK\n";
+msgrcv($id, $buf, 1024, $type_sent, 0) or die "Recieve Failed";
+print "Message queue OK\n";
+
 #create a socket, make it reusable 
 socket(SERVER, PF_INET, SOCK_STREAM, $proto) or die "socket: $!"; 
 setsockopt(SERVER, SOL_SOCKET, SO_REUSEADDR, 1) or die "setsock: $!"; 
@@ -41,7 +49,7 @@ if(my $pid = fork()){
 	#http://www.bearcave.com/unix_hacks/perl/perl.htm
 	#"however, apparently last cannot be used to exit while loops in perl" my experience too:(
 	 
-	for(;accept(CLIENT, SERVER);){ 
+	for(;accept(CLIENT, SERVER); $mygid++){ 
 		last if fork();
 	}
 	CLIENT->autoflush(1);
@@ -57,7 +65,7 @@ if(my $pid = fork()){
 	undef $buf;
 	undef $line;
 	print "sending add\n";
-	msgsnd($id, pack("l! l! l!", $add_type, $rpid, $rid), 0);
+	msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
 	print CLIENT "Hello, $rid\n";
 	print "sent greeting\n";
 	for (;defined($line = <CLIENT>) or msgrcv($id, $buf, 1024, $mygid, 0);){
@@ -82,7 +90,7 @@ if(my $pid = fork()){
 	undef $line;
 	undef $abuf;
 	undef $tbuf;
-	while(defined($line = <STDIN>) or msgrcv($id, $abuf, 1024, $add_type, 0) or msgrcv($id, $tbuf, 1024, $send_type, 0)){
+	while(defined($line = <>) or msgrcv($id, $abuf, 1024, $add_type, 0) or msgrcv($id, $tbuf, 1024, $send_type, 0)){
 		if(defined $line){
 			if($line =~ /^pgdb_/){
 				if($line =~ /pgdb_list_hosts/){
@@ -108,8 +116,8 @@ if(my $pid = fork()){
 			}
 		}
 		if(defined $abuf){
-			my($t, $rpid, $rid) = unpack("l! l! l!", $abuf);
-			my %h = {"rpid" => $rpid, "rid" => $rid};	
+			my($t, $rpid, $rid, $mygid) = unpack("l! l! l! l!", $abuf);
+			my %h = {"mygid"=>$mygid, "rpid" => $rpid, "rid" => $rid};	
 			$nodes{$rid} = \&h;
 		}
 		if(defined $tbuf){

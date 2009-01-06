@@ -1,6 +1,4 @@
 #! /usr/bin/perl -w 
-# client1.pl - a simple client 
-#---------------- 
 
 use strict; 
 use Socket; 
@@ -28,15 +26,15 @@ SOCKET->autoflush(1);
 
 #remote pid : remote mpi id : remote hostname
 my $line = <SOCKET>;
-print $line;
+chomp $line;
+print "Preamble: $line\n";
 print SOCKET "$progpid:$progid:".`hostname`."\n";
 #print "$progpid:$progid:" . `hostname` . "\n";
 $line = <SOCKET>;
-print $line;
+chomp $line;
+print "Greeting: $line\n";
 
-my $GDBSTDOUT;
-my $GDBSTDIN;
-my $GDBSTDERR;
+my ($GDBSTDOUT, $GDBSTDIN, $GDBSTDERR);
 my $gdbpid = open3($GDBSTDIN, $GDBSTDOUT, $GDBSTDERR, "gdb $progname $progpid");
 
 if(my $mypid = fork()){
@@ -48,9 +46,16 @@ if(my $mypid = fork()){
 	}
 	
 } else {
-	while(my $line = (<$GDBSTDOUT> ||  <$GDBSTDERR>)){
+	my ($oline, $eline, $line);
+	while(defined($oline = <$GDBSTDOUT>) or defined($eline =  <$GDBSTDERR>)){
+		$line = defined $oline ? $oline : "";
+		$line = "$line$eline" if defined $eline;
+				
 		print $line;
 		print SOCKET $line;
+		
+		undef $oline;
+		undef $eline;
 	}
 }
 
