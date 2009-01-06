@@ -27,10 +27,13 @@ connect(SOCKET, $paddr) or die "connect: $!";
 SOCKET->autoflush(1);
 
 #remote pid : remote mpi id : remote hostname
-#print <SOCKET>;
+my $line = <SOCKET>;
+print $line;
 print SOCKET "$progpid:$progid:".`hostname`."\n";
 #print "$progpid:$progid:" . `hostname` . "\n";
-print <SOCKET>;
+$line = <SOCKET>;
+print $line;
+
 my $GDBSTDOUT;
 my $GDBSTDIN;
 my $GDBSTDERR;
@@ -46,6 +49,7 @@ if(my $mypid = fork()){
 	
 } else {
 	while(my $line = (<$GDBSTDOUT> ||  <$GDBSTDERR>)){
+		print $line;
 		print SOCKET $line;
 	}
 }

@@ -1,6 +1,4 @@
 #! /usr/bin/perl -w 
-# server0.pl 
-#-------------------- 
 
 use strict; 
 use Socket; 
@@ -18,7 +16,6 @@ my $rcvd;
 my $type_rcvd;
 
 die "# msgsnd failed\n" unless defined $id;
-STDOUT->autoflush(1);
 #create a socket, make it reusable 
 socket(SERVER, PF_INET, SOCK_STREAM, $proto) or die "socket: $!"; 
 setsockopt(SERVER, SOL_SOCKET, SO_REUSEADDR, 1) or die "setsock: $!"; 
@@ -47,24 +44,26 @@ if(my $pid = fork()){
 	for(;accept(CLIENT, SERVER);){ 
 		last if fork();
 	}
-
+	CLIENT->autoflush(1);
 	print CLIENT "VER 1 PGDB-JK\n";
 
 	my $line = <CLIENT>;
 	print $line;
+	print "huh\n";
 	#remote pid : remote mpi id : remote hostname
 	my ($rpid, $rid, $rhost) = split(/:/, $line);
 
-	#if for some reason there is not mpi id, then set it to the fork's number
-	#$rid = $mygid if $rid == -1;
 	my $buf;
 	undef $buf;
 	undef $line;
+	print "sending add\n";
 	msgsnd($id, pack("l! l! l!", $add_type, $rpid, $rid), 0);
 	print CLIENT "Hello, $rid\n";
+	print "sent greeting\n";
 	for (;defined($line = <CLIENT>) or msgrcv($id, $buf, 1024, $mygid, 0);){
 		if(defined $line){
 			chomp $line;
+			print $line;
 			msgsnd($id, pack("l! l! a*", $send_type, $mygid, $line), 0);
 		}
 		if(defined $buf){
@@ -102,7 +101,7 @@ if(my $pid = fork()){
 							msgsnd($id, pack("l! a*", $h->{gid}, $text), 0);
 						} 	
 					} else {
-						my $h = %nodes->{$mach};
+						my $h = $nodes{$mach};
 						msgsnd($id, pack("l! a*", $h->{gid}, $text), 0);
 					}
 				}
@@ -111,7 +110,7 @@ if(my $pid = fork()){
 		if(defined $abuf){
 			my($t, $rpid, $rid) = unpack("l! l! l!", $abuf);
 			my %h = {"rpid" => $rpid, "rid" => $rid};	
-			%nodes->{$rid} = \&h;
+			$nodes{$rid} = \&h;
 		}
 		if(defined $tbuf){
 			my($t, $rid, $msg) = unpack("l! l! a*", $abuf);

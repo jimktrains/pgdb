@@ -12,5 +12,6 @@ SOCKET->autoflush(1);
 
 print SOCKET "JIM:TEST:".`hostname`."\n";
 print SOCKET "WHOOO\n";
-print <SOCKET>;
+my $x =  <SOCKET>;
+print $x;
 close SOCKET or die "close: $!"
