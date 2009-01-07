@@ -39,8 +39,11 @@ my $gdbpid = open3($GDBSTDIN, $GDBSTDOUT, $GDBSTDERR, "gdb $progname $progpid");
 
 if(my $mypid = fork()){
 	my $cmd = "";
+	print  "Waiting for a command\n";
 	while($cmd ne "quit"){
+		print "in while\n";
 		$cmd = <SOCKET>;
+		print "Got: $cmd \n";
 		$cmd = "quit" if not defined $cmd;
 		print $GDBSTDOUT $cmd; 
 	}

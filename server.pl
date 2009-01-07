@@ -69,48 +69,53 @@ if(not fork()){
 				and accept(CLIENT, SERVER) 
 			;$mygid++){ 
 			last if fork();
-			#$w = 1;
-			#last if fork();
-			#$w = 0;
+			$w = 1;
+			last if fork();
+			$w = 0;
 		}
 		if(not $dead){
-			print "Testing Sending\n";
-			msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
-			print "Sent OK\n";
+			if($w){
+				print "Testing Sending\n";
+				msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
+				print "Sent OK\n";
 
-			CLIENT->autoflush(1);
-			print CLIENT "VER 1 PGDB-JK\n";
+				CLIENT->autoflush(1);
+				print CLIENT "VER 1 PGDB-JK\n";
 
-			my $line = <CLIENT>;
-			print $line;
-			print "huh\n";
-			#remote pid : remote mpi id : remote hostname
-			my ($rpid, $rid, $rhost) = split(/:/, $line);
+				my $line = <CLIENT>;
+				print $line;
+				print "huh\n";
+				#remote pid : remote mpi id : remote hostname
+				my ($rpid, $rid, $rhost) = split(/:/, $line);
 
-			my $buf;
-			undef $buf;
-			undef $line;
-			print "sending add\n";
-			msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
-			print CLIENT "Hello, $rid\n";
-			print "sent greeting\n";
-			$line = <CLIENT>;
-		#	print "First line: $line";
-		#	$line = <CLIENT>;
-		#	print $line;
-			#my $flags = 0;
-			#fcntl(CLIENT, F_GETFL, $flags) || die $!; # Get the current flags on the filehandle
-			#$flags |= O_NONBLOCK; # Add non-blocking to the flags
-			#fcntl(CLIENT, F_SETFL, $flags) || die $!; # Set the flags on the filehandle
-			for (;;$line = <CLIENT>, msgrcv($id, $buf, 1024, $mygid, IPC_NOWAIT)){
-				if(defined $line and length $line){
-					msgsnd($id, pack("l! l! a*", $send_type, $rid, $line), 0);
+				my $buf;
+				undef $buf;
+				undef $line;
+				print "sending add\n";
+				msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
+				print CLIENT "Hello, $rid\n";
+				print "sent greeting\n";
+				$line = <CLIENT>;
+			#	print "First line: $line";
+			#	$line = <CLIENT>;
+			#	print $line;
+				my $flags = 0;
+				#fcntl(CLIENT, F_GETFL, $flags) || die $!; # Get the current flags on the filehandle
+				#$flags |= O_NONBLOCK; # Add non-blocking to the flags
+				#fcntl(CLIENT, F_SETFL, $flags) || die $!; # Set the flags on the filehandle
+				while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
+					$line = <CLIENT>;
+					if(defined $line and length $line){
+						msgsnd($id, pack("l! l! a*", $send_type, $rid, $line), 0);
+					}
 				}
-				if(defined $buf and length $buf){
+			}else{
+				while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
+					print "Waiting for a message to $mygid\n";
+					msgrcv($id, $buf, 1024, $mygid,0);
 					my ($type_rcvd, $txt) = unpack("l! a*", $buf);
 					print CLIENT $txt;
-					last if($txt eq "quit");
-					undef $buf;
+					print "Sent $txt to the client ($mygid)\n";
 				}
 			}
 		}
@@ -143,6 +148,7 @@ if(not fork()){
 	#while(defined($line = <>) or msgrcv($id, $abuf, 1024, $add_type, 0) or msgrcv($id, $tbuf, 1024, $send_type, 0)){
 		if(length $lbuf){
 			my($t, $line) = unpack("l! a*", $lbuf);
+			print "GOT: $line";
 			if($line =~ /^pgdb_/){
 				if($line =~ /pgdb_list_hosts/){
 					print "Count: " . (length keys %nodes) . "\n";
@@ -151,12 +157,13 @@ if(not fork()){
 					}
 				}
 			} else {
-				my ($mach, $text) =  split(//, $line, 2);
+				my ($mach, $text) =  split(/ /, $line, 2);
 				if(not $mach =~ /(a|\d+)/){
 					print " $mach is not a valid host!\n " 
 				}else{
 					if($mach eq "a"){
 						foreach my $k (keys %nodes){
+							print "Sending  $text  to " . $nodes{$k} . "\n";
 							msgsnd($id, pack("l! a*", $nodes{$k}, $text), 0);
 						} 	
 					} else {
@@ -165,6 +172,7 @@ if(not fork()){
 					}
 				}
 			}
+			undef $lbuf;
 		}
 		if(length $abuf){
 			my($t, $rpid, $rid, $mygid) = unpack("l! l! l! l!", $abuf);
