@@ -49,11 +49,11 @@ if(my $mypid = fork()){
 	my ($oline, $eline, $line);
 	while(defined($oline = <$GDBSTDOUT>) or defined($eline =  <$GDBSTDERR>)){
 		$line = defined $oline ? $oline : "";
-		$line = "$line$eline" if defined $eline;
+		$line = $line."E:$eline" if defined $eline;
 				
 		print $line;
 		print SOCKET $line;
-		
+
 		undef $oline;
 		undef $eline;
 	}
