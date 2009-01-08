@@ -119,7 +119,6 @@ if(not fork()){
 				print "sent greeting to client\n" if $DEBUG;
 				$line = <CLIENT>;
 				my $flags = 0;
-				print CLIENT "st\n";
 				# Decrement the semaphore count
 				my $semop = -1;
 				my$opstring = pack("s!s!s!", $semnum, $semop, $semflag);
