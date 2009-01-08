@@ -96,7 +96,7 @@ if(not fork()){
 				undef $line;
 				print "sending add request to other proc\n" if $DEBUG;
 				msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
-				print CLIENT "Hello, $rid\n";
+				#print CLIENT "Hello, $rid\n";
 				print "sent greeting to client\n" if $DEBUG;
 				$line = <CLIENT>;
 			#	print "First line: $line";

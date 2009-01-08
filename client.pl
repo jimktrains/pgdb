@@ -27,12 +27,12 @@ SOCKET->autoflush(1);
 #remote pid : remote mpi id : remote hostname
 my $line = <SOCKET>;
 chomp $line;
-print "Preamble: $line\n";
+#print "Preamble: $line\n";
 print SOCKET "$progpid:$progid:".`hostname`."\n";
 #print "$progpid:$progid:" . `hostname` . "\n";
-$line = <SOCKET>;
-chomp $line;
-print "Greeting: $line\n";
+#$line = <SOCKET>;
+#chomp $line;
+#print "Greeting: $line\n";
 
 my ($GDBSTDOUT, $GDBSTDIN, $GDBSTDERR);
 my $gdbpid = open3($GDBSTDIN, $GDBSTDOUT, $GDBSTDERR, "gdb $progname $progpid");
