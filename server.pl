@@ -1,4 +1,4 @@
-#! /usr/bin/perl -w 
+#!/usr/bin/perl -w 
 
 use strict; 
 use Socket; 
@@ -180,7 +180,7 @@ if(not fork()){
 			$h{"mygid"}=$mygid;
 			$h{"rpid"}=$rpid;
 			$h{"rid"}=$rid;	
-			print "!!!Adding node: $mygid\n";
+			print "Adding node: $mygid\n";
 			$nodes{$rid} = $mygid;#\&h;
 			undef $abuf;
 		}
