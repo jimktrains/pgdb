@@ -49,19 +49,20 @@ if(my $mypid = fork()){
 		$cmd = "quit" if not defined $cmd;
 		print $GDBSTDOUT $cmd; 
 	}
-	
+	print "bye\n";
 } else {
 	my ($oline, $eline, $line);
 	while(defined($oline = <$GDBSTDOUT>) or defined($eline =  <$GDBSTDERR>)){
 		$line = defined $oline ? $oline : "";
 		$line = $line."E:$eline" if defined $eline;
 				
-		print $line;
+		#print $line;
 		print SOCKET $line;
 
 		undef $oline;
 		undef $eline;
 	}
+	print "bye2\n";
 }
 
 wait();

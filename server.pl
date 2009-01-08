@@ -5,9 +5,13 @@ use Socket;
 use IPC::SysV qw(IPC_NOWAIT IPC_PRIVATE IPC_RMID IPC_CREAT S_IRUSR S_IWUSR);
 use IO::Handle;
 use Fcntl;
+use Getopt::Std;
 
+my %options=();
+getopts("dp:",\%options);
+my $DEBUG = defined $options{d};
 # use port 7890 as default 
-my $port = shift || 7890; 
+my $port = defined $options{p} ? $options{p} :  7890; 
 my $proto = getprotobyname('tcp'); 
 my $id = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR | S_IWUSR);
 
@@ -18,14 +22,15 @@ my $type_rcvd;
 my $buf;
 die "message queue id not defined\n" unless defined $id;
 
-print "message queue id: $id\n";
-print "Testing message queue\n";
-msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
-print "Sent OK\n";
-msgrcv($id, $buf, 1024, $type_sent, 0) or die "Recieve Failed";
-my ($t1, $t2) = unpack("l! l!", $buf);
-print "Message queue " . ($t1 eq $t2 ? "OK"  : "BAD") . "\n";
-
+if($DEBUG){
+	print "message queue id: $id\n";
+	print "Testing message queue\n";
+	msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
+	print "Sent OK\n";
+	msgrcv($id, $buf, 1024, $type_sent, 0) or die "Recieve Failed";
+	my ($t1, $t2) = unpack("l! l!", $buf);
+	print "Message queue " . ($t1 eq $t2 ? "OK"  : "BAD") . "\n";
+}
 
 #create a socket, make it reusable 
 socket(SERVER, PF_INET, SOCK_STREAM, $proto) or die "socket: $!"; 
@@ -50,13 +55,16 @@ my $client_addr;
 if(not fork()){
 	my $mygid = 10;
 	my $dead = 0;
-	print "Testing Sending\n";
-	msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
-	print "Sent OK\n";
+
+	if($DEBUG){
+		print "Testing Sending\n";
+		msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
+		print "Sent OK\n";
+	}
 	#http://www.bearcave.com/unix_hacks/perl/perl.htm
 	#"however, apparently last cannot be used to exit while loops in perl" my experience too:(
 
-		my $kbuf;
+	my $kbuf;
 	 if(fork()){
 	 	my $line = "";
 	 	for(;not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT); $line = <>){
@@ -75,26 +83,21 @@ if(not fork()){
 		}
 		if(not $dead){
 			if($w){
-				print "Testing Sending\n";
-				msgsnd($id, pack("l! l!", $type_sent, $type_sent), 0) or die "Send failed";
-				print "Sent OK\n";
-
 				CLIENT->autoflush(1);
 				print CLIENT "VER 1 PGDB-JK\n";
 
 				my $line = <CLIENT>;
-				print $line;
-				print "huh\n";
+				print "ID String: $line" if $DEBUG;
 				#remote pid : remote mpi id : remote hostname
 				my ($rpid, $rid, $rhost) = split(/:/, $line);
 
 				my $buf;
 				undef $buf;
 				undef $line;
-				print "sending add\n";
+				print "sending add request to other proc\n" if $DEBUG;
 				msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
 				print CLIENT "Hello, $rid\n";
-				print "sent greeting\n";
+				print "sent greeting to client\n" if $DEBUG;
 				$line = <CLIENT>;
 			#	print "First line: $line";
 			#	$line = <CLIENT>;
@@ -111,44 +114,38 @@ if(not fork()){
 				}
 			}else{
 				while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
-					print "Waiting for a message to $mygid\n";
+					#print "Waiting for a message to $mygid\n";
 					msgrcv($id, $buf, 1024, $mygid,0);
 					my ($type_rcvd, $txt) = unpack("l! a*", $buf);
 					print CLIENT $txt;
-					print "Sent $txt to the client ($mygid)\n";
+					print "Sent $txt to the client ($mygid)\n" if $DEBUG;
 				}
 			}
 		}
 		print "bye\n";
 	}
 } else {
-	
-	print "Testing receiving\n";
-	msgrcv($id, $buf, 1024, $type_sent, 0) or die "Recieve Failed";
-	my ($t1, $t2) = unpack("l! l!", $buf);
-	print "Message queue " . ($t1 eq $t2 ? "OK"  : "BAD") . "\n";
 
+	if($DEBUG){
+		print "Testing receiving\n";
+		msgrcv($id, $buf, 1024, $type_sent, 0) or die "Recieve Failed";
+		my ($t1, $t2) = unpack("l! l!", $buf);
+		print "Message queue " . ($t1 eq $t2 ? "OK"  : "BAD") . "\n";
+	}
 
-	print "Testing receiving\n";
-	msgrcv($id, $buf, 1024, $type_sent, 0) or die "Recieve Failed";
-	($t1, $t2) = unpack("l! l!", $buf);
-	print "Message queue " . ($t1 eq $t2 ? "OK"  : "BAD") . "\n";
 
 	my $abuf;
 	my $tbuf;
 	my $lbuf;
 	my %nodes;
-	#while(defined($line = <>) or msgrcv($id, $abuf, 1024, $add_type, 0) or msgrcv($id, $tbuf, 1024, $send_type, 0)){
-	#while(msgrcv($id, $tbuf, 1024, $send_type, 0) or msgrcv($id, $abuf, 1024, $add_type, 0)){
 	for(;1;
 		msgrcv($id, $abuf, 1024, $add_type, IPC_NOWAIT),
 		msgrcv($id, $tbuf, 1024, $send_type, IPC_NOWAIT),
 		msgrcv($id, $lbuf, 1024, $stdin_type, IPC_NOWAIT),
 	){
-	#while(defined($line = <>) or msgrcv($id, $abuf, 1024, $add_type, 0) or msgrcv($id, $tbuf, 1024, $send_type, 0)){
-		if(length $lbuf){
+		if(defined $lbuf and length $lbuf){
 			my($t, $line) = unpack("l! a*", $lbuf);
-			print "GOT: $line";
+			print "GOT: $line" if $DEBUG;
 			if($line =~ /^pgdb_/){
 				if($line =~ /pgdb_list_hosts/){
 					print "Count: " . (length keys %nodes) . "\n";
@@ -163,7 +160,7 @@ if(not fork()){
 				}else{
 					if($mach eq "a"){
 						foreach my $k (keys %nodes){
-							print "Sending  $text  to " . $nodes{$k} . "\n";
+							print "Sending  $text  to " . $nodes{$k} . "\n" if $DEBUG;
 							msgsnd($id, pack("l! a*", $nodes{$k}, $text), 0);
 						} 	
 					} else {
@@ -174,17 +171,17 @@ if(not fork()){
 			}
 			undef $lbuf;
 		}
-		if(length $abuf){
+		if(defined $abuf and length $abuf){
 			my($t, $rpid, $rid, $mygid) = unpack("l! l! l! l!", $abuf);
 			my %h;
 			$h{"mygid"}=$mygid;
 			$h{"rpid"}=$rpid;
 			$h{"rid"}=$rid;	
-			print "Adding node: $mygid\n";
+			print "Adding node: $rid\n";
 			$nodes{$rid} = $mygid;#\&h;
 			undef $abuf;
 		}
-		if(length $tbuf){
+		if(defined $tbuf and length $tbuf){
 			my($t, $rid, $msg) = unpack("l! l! a*", $tbuf);
 			print "$rid $msg";
 			undef $tbuf;
