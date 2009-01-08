@@ -26,28 +26,19 @@ SOCKET->autoflush(1);
 
 #remote pid : remote mpi id : remote hostname
 my $line = <SOCKET>;
-chomp $line;
-#print "Preamble: $line\n";
 print SOCKET "$progpid:$progid:".`hostname`."\n";
 #print "$progpid:$progid:" . `hostname` . "\n";
-#$line = <SOCKET>;
-#chomp $line;
-#print "Greeting: $line\n";
+$line = <SOCKET>;
 
 my ($GDBSTDOUT, $GDBSTDIN, $GDBSTDERR);
 my $gdbpid = open3($GDBSTDIN, $GDBSTDOUT, $GDBSTDERR, "gdb $progname $progpid");
 
 if(my $mypid = fork()){
 	my $cmd = "";
-	print  "Waiting for a command\n";
-	my $line = <SOCKET>;
-	print "LINE: $line";
 	while($cmd ne "quit"){
-		print "in while\n";
 		$cmd = <SOCKET>;
-		print "Got: $cmd \n";
 		$cmd = "quit" if not defined $cmd;
-		print $GDBSTDOUT $cmd; 
+		print $GDBSTDIN $cmd; 
 	}
 	print "bye\n";
 } else {

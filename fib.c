@@ -18,7 +18,7 @@ int main(int argc, char* argv[]){
 	sprintf(dbg, "perl -w client.pl %s %d 1 &", argv[0], getpid());
 
 	system(dbg);
-	sleep(1);
+	sleep(5);
 	num = atoi(argv[2]);
 	
 	if(!strcmp(argv[1], "rec")){
