@@ -2,3 +2,21 @@ This is a set of perl scripts (client and server) that redirect the input and ou
 
 fib.c is a program I wrote as a small test.
 mpi_pong.c is a program written by Dave Turner that I use to test MPI.
+
+
+HOW TO USE
+----------
+Make sure that your program has something like:
+ sprintf(dbg, "perl -w client.pl %s %d 1 &", argv[0], getpid());
+ system(dbg);
+ sleep(5);
+
+ The arguments to client are "name of program" "pid" "mpirank"
+
+start a server in one window
+  perl -w server.pl
+start the mpi job in another
+
+When the debugging output comes
+ a <command> - sends a command to all nodes
+ # <command> - sends a command to node #
