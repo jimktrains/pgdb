@@ -7,7 +7,8 @@ use FileHandle;
 
 my $progname = shift or die "Must give program's name";
 my $progpid = shift or die "Must give program's pid";
-my $progid = shift or die "Must give program an ID";
+my $progid = shift; 
+die "Must give program an ID" unless defined $progid;
 
 # initialize host and port 
 my $host = shift || 'localhost'; 
