@@ -23,4 +23,5 @@ When the debugging output comes
  # <command> - sends a command to node #
 
  Note, when using the viewer, you do not need to prepend the # of
- the node, that is automatic
+ the node, that is automatic.  However, p and a commands (p commands
+ to pgdb and a is to all nodes) get passed along as normal.
