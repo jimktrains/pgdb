@@ -16,7 +16,8 @@ Make sure that your program has something like:
 start a server in one window
   perl -w server.pl
 start the mpi job in another
-
+if you want, start the viewer in another
+	perl -w viewer.pl <mpi rank of host you want to watch>
 When the debugging output comes
  a <command> - sends a command to all nodes
  # <command> - sends a command to node #
