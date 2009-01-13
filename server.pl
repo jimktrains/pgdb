@@ -47,8 +47,8 @@ my $add_type = 1;
 my $send_type = 2;
 my $stdin_type = 3; 
 my $kill_type = 4;
-my $add_veiwer_type = 5;
-my $stdin_viewer = 6;
+my $add_viewer_type = 5;
+my $stdin_viewer_type = 6;
 # accepting a connection 
 my $client_addr; 
 if(not fork()){
@@ -71,28 +71,13 @@ if(not fork()){
 		}
 	 }else{
 		my $w = 0; 
-		my $sid;
-		my $semnum = 0;
-		my $semflag = 0;
+		my $buf;
 		my	($line, $node_type, $rpid, $rid, $rhost);
 
 		for(;
 				not ($dead = msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT))
 				and accept(CLIENT, SERVER) 
 			;$mygid++){ 
-			$sid = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT ) || die "$!";
-
-			# 'take' semaphore
-			# wait for semaphore to be zero
-			my $semop = 0;
-			my $opstring1 = pack("s!s!s!", $semnum, $semop, $semflag);
-
-			# Increment the semaphore count
-			$semop = 1;
-			my $opstring2 = pack("s!s!s!", $semnum, $semop,  $semflag);
-			my $opstring = $opstring1 . $opstring2;
-
-			semop($sid,$opstring) || die "$!";
 
 			CLIENT->autoflush(1);
 			print CLIENT "VER 1 PGDB-JK\n";
@@ -108,7 +93,7 @@ if(not fork()){
 				msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
 			} elsif ($node_type eq "V"){
 				print "sending add viewer request to other proc\n" if $DEBUG;
-				msgsnd($id, pack("l! l! l! l!", $add_veiwer_type, $rpid, $rid, $mygid), 0);
+				msgsnd($id, pack("l! l! l! l!", $add_viewer_type, $rpid, $rid, $mygid), 0);
 			}
 			last if fork();
 			$w = 1;
@@ -118,17 +103,8 @@ if(not fork()){
 		if(not $dead){
 			if($node_type eq "D"){
 				if($w){
-					my $buf;
 					undef $buf;
 					undef $line;
-					print "sending add request to other proc\n" if $DEBUG;
-					msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
-					my $flags = 0;
-					# Decrement the semaphore count
-					my $semop = -1;
-					my$opstring = pack("s!s!s!", $semnum, $semop, $semflag);
-
-					semop($sid,$opstring) || die "$!";
 
 					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
 						#print "Waiting for a message to $mygid\n";
@@ -139,10 +115,6 @@ if(not fork()){
 					}
 				}else{
 					my $line;
-					# wait for semaphore to be zero
-					my $semop = 0;
-					my $opstring = pack("s!s!s!", $semnum, $semop, $semflag);
-					semop($sid,$opstring) || die "$!";
 
 					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
 						$line = <CLIENT>;
@@ -151,17 +123,10 @@ if(not fork()){
 						}
 					}
 				}
-			} else {
+			} elsif ($node_type eq "V"){
 				if($w){
-					my $buf;
 					undef $buf;
 					undef $line;
-					my $flags = 0;
-					# Decrement the semaphore count
-					my $semop = -1;
-					my$opstring = pack("s!s!s!", $semnum, $semop, $semflag);
-
-					semop($sid,$opstring) || die "$!";
 
 					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
 						#print "Waiting for a message to $mygid\n";
@@ -172,15 +137,11 @@ if(not fork()){
 					}
 				}else{
 					my $line;
-					# wait for semaphore to be zero
-					my $semop = 0;
-					my $opstring = pack("s!s!s!", $semnum, $semop, $semflag);
-					semop($sid,$opstring) || die "$!";
 
 					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
 						$line = <CLIENT>;
 						if(defined $line and length $line){
-							msgsnd($id, pack("l! l! a*", $stdin_type, $mygid, $line), 0);
+							msgsnd($id, pack("l! l! a*", $stdin_viewer_type, $mygid, $line), 0);
 						}
 					}
 				}
@@ -196,33 +157,36 @@ if(not fork()){
 		my ($t1, $t2) = unpack("l! l!", $buf);
 		print "Message queue " . ($t1 eq $t2 ? "OK"  : "BAD") . "\n";
 	}
-
-
 	my $abuf;
 	my $tbuf;
+	my $vabuf;
+	my $vrbuf;
 	my $lbuf;
 	my %nodes;
 	my %nodes2;
+	my %viewers;
+	my %viewers2;
+	my $im_done = 0;
 	my %output;
-	for(;1;
-		msgrcv($id, $abuf, 1024, $add_type, IPC_NOWAIT),
-		msgrcv($id, $tbuf, 1024, $send_type, IPC_NOWAIT),
-		msgrcv($id, $lbuf, 1024, $stdin_type, IPC_NOWAIT),
-	){
-		if(defined $lbuf and length $lbuf){
-			my($t, $line) = unpack("l! a*", $lbuf);
+sub stdin_parse {
+			my $out = "";
+			my $line =shift;
 			print "GOT: $line" if $DEBUG;
-			if($line =~ /^pgdb_/){
-				if($line =~ /pgdb_list_hosts/){
-					print "Count: " . (length keys %nodes) . "\n";
+			if($line =~ /^p\s+(.*)/){
+				$line = $1;
+				if($line =~ /list_hosts/){
+					$out .= "Count: " . (length keys %nodes) . "\n";
 					foreach my $n (keys %nodes){
-						print "rid: $n\n";
+						$out .= "rid: $n\n";
 					}
+				}elsif($line =~ /quit/){
+					$im_done = 1;
 				}
 			} else {
 				my ($mach, $text) =  split(/ /, $line, 2);
 				if(not $mach =~ /(a|\d+)/){
-					print " $mach is not a valid host!\n " 
+					$out .= " $mach is not a valid host!\n ";
+					$out .= (length $mach)."\n";
 				}else{
 					if($mach eq "a"){
 						foreach my $k (keys %nodes){
@@ -235,7 +199,27 @@ if(not fork()){
 					}
 				}
 			}
+	return $out;
+}
+
+	for(;not $im_done;
+		msgrcv($id, $abuf, 1024, $add_type, IPC_NOWAIT),
+		msgrcv($id, $vabuf, 1024, $add_viewer_type, IPC_NOWAIT),
+		msgrcv($id, $vrbuf, 1024, $stdin_viewer_type, IPC_NOWAIT),
+		msgrcv($id, $tbuf, 1024, $send_type, IPC_NOWAIT),
+		msgrcv($id, $lbuf, 1024, $stdin_type, IPC_NOWAIT),
+	){
+		if(defined $lbuf and length $lbuf){
+			my($t, $line) = unpack("l! a*", $lbuf);
+			print stdin_parse($line);
 			undef $lbuf;
+		}
+		if(defined $vrbuf and length $vrbuf){
+			my($t, $viewer, $line) = unpack("l! l! a*", $vrbuf);
+			$line = $viewers2{$viewer} . " ".  $line if not $line =~ /^[p|a|\d+]\s+/ ;
+			my $out = stdin_parse($line);
+			msgsnd($id, pack("l! a*", $viewer, $out), 0);
+			undef $vrbuf;
 		}
 		if(defined $abuf and length $abuf){
 			my($t, $rpid, $rid, $mygid) = unpack("l! l! l! l!", $abuf);
@@ -248,13 +232,27 @@ if(not fork()){
 			$nodes2{$mygid} = $rid;#\&h;
 			undef $abuf;
 		}
+		if(defined $vabuf and length $vabuf){
+			my($t, $rpid, $rid, $mygid) = unpack("l! l! l! l!", $vabuf);
+			my %h;
+			$h{"mygid"}=$mygid;
+			$h{"rpid"}=$rpid;
+			$h{"rid"}=$rid;	
+			print "Adding viewer: $rid ($mygid)\n";
+			$viewers{$rid} = $mygid;#\&h;
+			$viewers2{$mygid} = $rid;#\&h;
+			undef $vabuf;
+		}
 		if(defined $tbuf and length $tbuf){
 			my($t, $rid, $msg) = unpack("l! l! a*", $tbuf);
 			$rid = $nodes2{$rid};
 			if( not defined $output{$rid}){
 				$output{$rid}[0] = $msg;
 			} else {
-				push @{$output{$rid}}, $msg
+				push @{$output{$rid}}, $msg;
+			}
+			if(defined $viewers{$rid}){
+				msgsnd($id, pack("l! a*", $viewers{$rid}, $msg), 0);
 			}
 			print "$rid $msg";
 			undef $tbuf;

@@ -2,11 +2,10 @@
 
 use strict; 
 use Socket; 
-use IPC::Open3;
 use FileHandle;
 
-my $progname = shift or die "Must give program's name";
-my $progpid = shift or die "Must give program's pid";
+#my $progname = shift or die "Must give program's name";
+my $progpid = $$ or die "Must give program's pid";
 my $progid = shift; 
 die "Must give program an ID" unless defined $progid;
 
@@ -27,33 +26,29 @@ SOCKET->autoflush(1);
 
 #remote pid : remote mpi id : remote hostname
 my $line = <SOCKET>;
-# hostname returns a nl
-print SOCKET "D:$progpid:$progid:".`hostname`;
+#hostname returns a nl
+print SOCKET "V:$progpid:$progid:".`hostname`;
 #print "$progpid:$progid:" . `hostname` . "\n";
 $line = <SOCKET>;
 
-my ($GDBSTDOUT, $GDBSTDIN, $GDBSTDERR);
-my $gdbpid = open3($GDBSTDIN, $GDBSTDOUT, $GDBSTDERR, "gdb $progname $progpid");
 
 if(my $mypid = fork()){
 	my $cmd = "";
 	while($cmd ne "quit"){
 		$cmd = <SOCKET>;
 		$cmd = "quit" if not defined $cmd;
-		print $GDBSTDIN $cmd; 
+		print $cmd; 
 	}
 	print "bye\n";
 } else {
 	my ($oline, $eline, $line);
-	while(defined($oline = <$GDBSTDOUT>) or defined($eline =  <$GDBSTDERR>)){
+	for(;defined($oline = <>);){
 		$line = defined $oline ? $oline : "";
-		$line = $line."E:$eline" if defined $eline;
 				
 		#print $line;
 		print SOCKET $line;
-
+		last if $line eq "quit\n";
 		undef $oline;
-		undef $eline;
 	}
 	print "bye2\n";
 }
