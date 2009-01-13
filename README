@@ -21,3 +21,6 @@ if you want, start the viewer in another
 When the debugging output comes
  a <command> - sends a command to all nodes
  # <command> - sends a command to node #
+
+ Note, when using the viewer, you do not need to prepend the # of
+ the node, that is automatic
