@@ -43,13 +43,12 @@ my $paddr = sockaddr_in($port, INADDR_ANY);
 bind(SERVER, $paddr) or die "bind: $!"; 
 listen(SERVER, SOMAXCONN) or die "listen: $!"; 
 print "SERVER started on port $port\n"; 
-# Add's the node to the list
 my $add_type = 1;
-
-# Node is sending a message
 my $send_type = 2;
 my $stdin_type = 3; 
 my $kill_type = 4;
+my $add_veiwer_type = 5;
+my $stdin_viewer = 6;
 # accepting a connection 
 my $client_addr; 
 if(not fork()){
@@ -75,6 +74,7 @@ if(not fork()){
 		my $sid;
 		my $semnum = 0;
 		my $semflag = 0;
+		my	($line, $node_type, $rpid, $rid, $rhost);
 
 		for(;
 				not ($dead = msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT))
@@ -94,55 +94,94 @@ if(not fork()){
 
 			semop($sid,$opstring) || die "$!";
 
+			CLIENT->autoflush(1);
+			print CLIENT "VER 1 PGDB-JK\n";
+
+			my $line = <CLIENT>;
+			print "ID String: $line" if $DEBUG;
+			#remote pid : remote mpi id : remote hostname
+			($node_type, $rpid, $rid, $rhost) = split(/:/, $line);
+			print "sent greeting to client\n" if $DEBUG;
+			print CLIENT "Hello, $rid\n";
+			if($node_type eq "D"){
+				print "sending add debugger request to other proc\n" if $DEBUG;
+				msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
+			} elsif ($node_type eq "V"){
+				print "sending add viewer request to other proc\n" if $DEBUG;
+				msgsnd($id, pack("l! l! l! l!", $add_veiwer_type, $rpid, $rid, $mygid), 0);
+			}
 			last if fork();
 			$w = 1;
 			last if fork();
 			$w = 0;
 		}
 		if(not $dead){
+			if($node_type eq "D"){
+				if($w){
+					my $buf;
+					undef $buf;
+					undef $line;
+					print "sending add request to other proc\n" if $DEBUG;
+					msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
+					my $flags = 0;
+					# Decrement the semaphore count
+					my $semop = -1;
+					my$opstring = pack("s!s!s!", $semnum, $semop, $semflag);
 
-			if($w){
-				CLIENT->autoflush(1);
-				print CLIENT "VER 1 PGDB-JK\n";
+					semop($sid,$opstring) || die "$!";
 
-				my $line = <CLIENT>;
-				print "ID String: $line" if $DEBUG;
-				#remote pid : remote mpi id : remote hostname
-				my ($rpid, $rid, $rhost) = split(/:/, $line);
+					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
+						#print "Waiting for a message to $mygid\n";
+						msgrcv($id, $buf, 1024, $mygid,0);
+						my ($type_rcvd, $txt) = unpack("l! a*", $buf);
+						print CLIENT $txt;
+						print "Sent $txt to the client ($mygid)\n" if $DEBUG;
+					}
+				}else{
+					my $line;
+					# wait for semaphore to be zero
+					my $semop = 0;
+					my $opstring = pack("s!s!s!", $semnum, $semop, $semflag);
+					semop($sid,$opstring) || die "$!";
 
-				my $buf;
-				undef $buf;
-				undef $line;
-				print "sending add request to other proc\n" if $DEBUG;
-				msgsnd($id, pack("l! l! l! l!", $add_type, $rpid, $rid, $mygid), 0);
-				print CLIENT "Hello, $rid\n";
-				print "sent greeting to client\n" if $DEBUG;
-				$line = <CLIENT>;
-				my $flags = 0;
-				# Decrement the semaphore count
-				my $semop = -1;
-				my$opstring = pack("s!s!s!", $semnum, $semop, $semflag);
-
-				semop($sid,$opstring) || die "$!";
-
-				while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
-					#print "Waiting for a message to $mygid\n";
-					msgrcv($id, $buf, 1024, $mygid,0);
-					my ($type_rcvd, $txt) = unpack("l! a*", $buf);
-					print CLIENT $txt;
-					print "Sent $txt to the client ($mygid)\n" if $DEBUG;
+					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
+						$line = <CLIENT>;
+						if(defined $line and length $line){
+							msgsnd($id, pack("l! l! a*", $send_type, $mygid, $line), 0);
+						}
+					}
 				}
-			}else{
-				my $line;
-				# wait for semaphore to be zero
-				my $semop = 0;
-				my $opstring = pack("s!s!s!", $semnum, $semop, $semflag);
-				semop($sid,$opstring) || die "$!";
+			} else {
+				if($w){
+					my $buf;
+					undef $buf;
+					undef $line;
+					my $flags = 0;
+					# Decrement the semaphore count
+					my $semop = -1;
+					my$opstring = pack("s!s!s!", $semnum, $semop, $semflag);
 
-				while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
-					$line = <CLIENT>;
-					if(defined $line and length $line){
-						msgsnd($id, pack("l! l! a*", $send_type, $mygid, $line), 0);
+					semop($sid,$opstring) || die "$!";
+
+					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
+						#print "Waiting for a message to $mygid\n";
+						msgrcv($id, $buf, 1024, $mygid,0);
+						my ($type_rcvd, $txt) = unpack("l! a*", $buf);
+						print CLIENT $txt;
+						print "Sent $txt to the client ($mygid)\n" if $DEBUG;
+					}
+				}else{
+					my $line;
+					# wait for semaphore to be zero
+					my $semop = 0;
+					my $opstring = pack("s!s!s!", $semnum, $semop, $semflag);
+					semop($sid,$opstring) || die "$!";
+
+					while(not msgrcv($id, $kbuf, 24, $kill_type, IPC_NOWAIT)){
+						$line = <CLIENT>;
+						if(defined $line and length $line){
+							msgsnd($id, pack("l! l! a*", $stdin_type, $mygid, $line), 0);
+						}
 					}
 				}
 			}
@@ -164,6 +203,7 @@ if(not fork()){
 	my $lbuf;
 	my %nodes;
 	my %nodes2;
+	my %output;
 	for(;1;
 		msgrcv($id, $abuf, 1024, $add_type, IPC_NOWAIT),
 		msgrcv($id, $tbuf, 1024, $send_type, IPC_NOWAIT),
@@ -211,6 +251,11 @@ if(not fork()){
 		if(defined $tbuf and length $tbuf){
 			my($t, $rid, $msg) = unpack("l! l! a*", $tbuf);
 			$rid = $nodes2{$rid};
+			if( not defined $output{$rid}){
+				$output{$rid}[0] = $msg;
+			} else {
+				push @{$output{$rid}}, $msg
+			}
 			print "$rid $msg";
 			undef $tbuf;
 		}

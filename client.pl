@@ -27,7 +27,7 @@ SOCKET->autoflush(1);
 
 #remote pid : remote mpi id : remote hostname
 my $line = <SOCKET>;
-print SOCKET "$progpid:$progid:".`hostname`."\n";
+print SOCKET "D:$progpid:$progid:".`hostname`."\n";
 #print "$progpid:$progid:" . `hostname` . "\n";
 $line = <SOCKET>;
 
