@@ -24,7 +24,6 @@
 This is a set of perl scripts (client and server) that redirect the input and output of gdb (or any program really) over the network to a server, so that multiple nodes can run gdb without the need for each to have a terminal, as gdb usually needs.
 
 fib.c is a program I wrote as a small test.
-mpi_pong.c is a program written by Dave Turner that I use to test MPI.
 
 
 HOW TO USE
