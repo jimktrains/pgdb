@@ -199,7 +199,7 @@ sub stdin_parse {
 			my $out = "";
 			my $line =shift;
 			print "GOT: $line" if $DEBUG;
-			if($line =~ /^p\s+(.*)/){
+			if($line =~ /^pgdb\s+(.*)/){
 				$line = $1;
 				if($line =~ /list_hosts/){
 					$out .= "Count: " . (length keys %nodes) . "\n";
